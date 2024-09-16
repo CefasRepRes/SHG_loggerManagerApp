@@ -1,0 +1,13 @@
+name: sthloggermanager
+title: STHloggerManager
+username: tom.hull@cefas.co.uk
+account: tom.hull@cefas.co.uk
+server: rconnectdev.corp.cefas.co.uk
+hostUrl: https://rconnectdev.corp.cefas.co.uk/__api__
+appId: 265
+bundleId: 990
+url: https://rconnectdev.corp.cefas.co.uk/content/1c84d4c1-ebc1-46f2-961d-25a0675cc836/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: processed_hobo.rds|test.R
