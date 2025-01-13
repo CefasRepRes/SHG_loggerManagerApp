@@ -1,22 +1,12 @@
 library(shiny,quietly=T)
 library(data.table, quietly=T)
 library(leaflet, quietly=T)
-library(pool, quietly = T)
+library(DBI, quietly = T)
 library(plotly, quietly = T)
 library(shinyDatetimePickers)
-library(yaml)
 
 Sys.setenv(tz = "UTC")
-
-pw = yaml::read_yaml("pw.yaml")
-
-db = pool::dbPool(
-  drv = RPostgres::Postgres(),
-  dbname = pw$dbname,
-  host = pw$host,
-  port = pw$port,
-  application_name = "shiny",
-  user = pw$user, password = pw$password)
+db = DBI::dbConnect(RSQLite::SQLite(), "loggerdb.sqlite3")
 
 read.hobotemp <- function(filename){
   lns = readLines(filename)
@@ -29,6 +19,10 @@ read.hobotemp <- function(filename){
   d[, title := title]
   return(d)
 }
+
+onStop(function() {
+  DBI::dbDisconnect(db)
+})
 
 shinyServer(function(input, output, session) {
   dat = reactiveValues()
@@ -48,6 +42,7 @@ shinyServer(function(input, output, session) {
     query = paste0("SELECT * FROM data WHERE deployment_id IN (", selected_deployment_ids, ")")
     print(query)
     dat$results = setDT(dbGetQuery(db, query))
+    dat$results[, datetime := as.POSIXct(datetime, format = "%Y-%m-%dT%H:%M")]
   })
 
   output$map = renderLeaflet({
@@ -93,6 +88,6 @@ shinyServer(function(input, output, session) {
   })
 
   observeEvent(input$debug, {
-    # browser()
+    browser()
   })
 })
