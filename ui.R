@@ -27,10 +27,11 @@ shinyUI(
       tabPanel("Deployments",
         DT::DTOutput("deployments")
         ),
-      tabPanel("Upload HOBO",
+      tabPanel("Upload",
         # ---- View Upload
         column(3,
-          fileInput("hobo_file", "Hobo", buttonLabel = "Upload..."),
+          fileInput("hobo_file", "Hobo", buttonLabel = "Upload...", accept = c(".csv", ".xlsx")),
+          fileInput("minidot_file", "Minidot", buttonLabel = "Upload...", accept = ".txt"),
           selectizeInput("select_location", "Select location", choices = ""),
           h4("select in-water start:"),
           shinyDatetimePickers::datetimeMaterialPickerInput("deployment_start"),
@@ -44,6 +45,7 @@ shinyUI(
           )
         ),
       tabPanel("Calibration",
+        DT::DTOutput("cal_tbl")
         ),
     ),
     actionButton("debug", "debug")

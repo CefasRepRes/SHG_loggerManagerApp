@@ -4,21 +4,11 @@ library(leaflet, quietly=T)
 library(DBI, quietly = T)
 library(plotly, quietly = T)
 library(shinyDatetimePickers)
+library(readxl)
 
 Sys.setenv(tz = "UTC")
 db = DBI::dbConnect(RSQLite::SQLite(), "loggerdb.sqlite3")
-
-read.hobotemp <- function(filename){
-  lns = readLines(filename)
-  title = strsplit(lns[1], ': ')[[1]][2]
-  info = strsplit(lns[2], '","')[[1]]
-  serial = stringr::str_extract(info[3], "\\d+")
-  d = fread(text = lns, skip = 2, select = 1:3, col.names = c("scan", "dateTime", "value"))
-  d[, dateTime := as.POSIXct(dateTime, format = "%m/%d/%y %I:%M:%S %p")]
-  d[, serialnumber := serial]
-  d[, title := title]
-  return(d)
-}
+source("functions.R")
 
 onStop(function() {
   DBI::dbDisconnect(db)
@@ -26,9 +16,9 @@ onStop(function() {
 
 shinyServer(function(input, output, session) {
   dat = reactiveValues()
-  dat$deployments = setDT(dbGetQuery(db, "SELECT * FROM deployments"))
+  dat$deployments = setDT(dbGetQuery(db, "SELECT * FROM deployments ORDER BY start DESC"))
   dat$instruments = setDT(dbGetQuery(db, "SELECT * FROM instruments"))
-  dat$locations = setDT(dbGetQuery(db, "SELECT * FROM locations"))
+  dat$locations = setDT(dbGetQuery(db, "SELECT * FROM locations ORDER BY name"))
 
   observe({
     updateSelectInput(session, "select_deployment", choices = dat$deployments$filename)
@@ -75,16 +65,59 @@ shinyServer(function(input, output, session) {
   })
 
   observeEvent(input$hobo_file, {
-  # ---- load_file
-    dat$upload = read.hobotemp(input$hobo_file$datapath)
+  # ---- load hobo
+    if(grepl("\\.csv", input$hobo_file$name, ignore.case = T)){
+      dat$upload = read.hoboV2(input$hobo_file$datapath)
+    }
+    if(grepl("\\.xlsx", input$hobo_file$name, ignore.case = T)){
+      dat$upload = read.hoboMX(input$hobo_file$datapath)
+    }
     dat$upload$filename = input$hobo_file$name
     updateDatetimeMaterialPickerInput(session, "deployment_start", min(dat$upload$dateTime, na.rm=T))
     updateDatetimeMaterialPickerInput(session, "deployment_end", max(dat$upload$dateTime, na.rm=T))
-    # TODO validate hobo
   })
+  
+  observeEvent(input$minidot_file, {
+  # ---- load_minidot
+    dat$upload = read.miniDOT(input$minidot_file$datapath)
+    dat$upload$filename = input$minidot_file$name
+    updateDatetimeMaterialPickerInput(session, "deployment_start", min(dat$upload$dateTime, na.rm=T))
+    updateDatetimeMaterialPickerInput(session, "deployment_end", max(dat$upload$dateTime, na.rm=T))
+  })
+  
+  
 
   observeEvent(input$submit, {
-    showNotification("not implemented", type="warning", duration = 5)
+    new_deployment_id = dbGetQuery(db, "SELECT MAX(deployment_id)+1 AS id FROM deployments")$id
+    new_deployment = data.table(filename = dat$upload$filename[1],
+                                location_id = input$select_location,
+                                deployment_id = new_deployment_id,
+                                instrument_id = dat$instruments[serial == dat$upload$serialnumber[1]]$serial,
+                                location_id = dat$locations[name == input$select_location]$location_id,
+                                start = min(dat$upload$dateTime, na.rm = T),
+                                end = max(dat$upload$dateTime, na.rm = T))
+    results = dat$upload[,.(datetime = dateTime,
+                            deployment_id = new_deployment_id,
+                            value,
+                            variable_id = variable_id,
+                            scan,
+                            flag = 0)]
+    results = results[!is.na(value)]
+    # apply flags
+    results[datetime < input$deployment_start, flag := 1]
+    results[datetime > input$deployment_end, flag := 1]
+    dbWithTransaction(db, {
+      tryCatch({
+        dbAppendTable(db, "deployments", new_deployment)
+        dbAppendTable(db, "results", results)
+        showNotification("data written to database", type="message", duration = 5)
+        },
+        error = function(e) {
+          cat("Error: ", conditionMessage(e))
+          showNotification(paste("Error writing to database:", conditionMessage(e)), duration=NULL, type = "error")
+          dbBreak()
+        })
+    })
   })
 
   observeEvent(input$debug, {
