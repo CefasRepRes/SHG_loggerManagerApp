@@ -5,6 +5,7 @@ read.hoboV2 <- function(filename){
   serial = stringr::str_extract(info[3], "\\d+")
   d = fread(text = lns, skip = 2, select = 1:3, col.names = c("scan", "dateTime", "value"))
   d[, dateTime := as.POSIXct(dateTime, format = "%m/%d/%y %I:%M:%S %p")]
+  d[, value := as.numeric(value)]
   d[, serialnumber := serial]
   d[, title := title]
   d[, variable_id := 1]
@@ -15,6 +16,7 @@ read.hoboMX <- function(filename){
   meta = setDT(readxl::read_xlsx(filename, "Details", col_names = c("meta1", "meta2", "meta3", "meta4")))
   data = setDT(readxl::read_xlsx(filename, "Data", col_names = c("scan", "dateTime", "value"), skip = 1))
   serial = meta[grepl("Serial Number", meta3)]$meta4
+  data[, value := as.numeric(value)]
   data[, serialnumber := serial]
   data[, title := ""]
   data[, variable_id := 1]
