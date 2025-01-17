@@ -141,7 +141,7 @@ shinyServer(function(input, output, session) {
       paste0("logger-", Sys.Date(), ".csv")
     },
     content = function(filename) {
-      write.csv(dat$results, file = filename, row.names = F)
+      fwrite(dat$data, file = filename)
     }
   )
   
