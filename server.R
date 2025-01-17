@@ -67,10 +67,6 @@ shinyServer(function(input, output, session) {
     dat$deployments
   })
   
-  output$cal_tbl = DT::renderDT({
-    dat$calibrations
-  })
-
   observeEvent(input$hobo_file, {
     if(input$hobo_file$name %in% dat$deployments$filename){
       showNotification("This file has already been uploaded to the database", duration=10, type = "error")
@@ -145,7 +141,7 @@ shinyServer(function(input, output, session) {
       paste0("logger-", Sys.Date(), ".csv")
     },
     content = function(filename) {
-      fwrite(dat$results, file = filename)
+      write.csv(dat$results, file = filename, row.names = F)
     }
   )
   

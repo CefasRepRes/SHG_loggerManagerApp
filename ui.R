@@ -48,21 +48,6 @@ shinyUI(
         column(9,
           plotlyOutput("pre_upload_plot", height = "80vh")
           )
-        ),
-      tabPanel("Calibration",
-               column(3,
-                 shinyDirButton("cal_folder", "Select reference data folder", "Select reference data folder", icon = icon("folder")),
-                 p(),
-                 actionButton("load_cals", "Load reference data", icon = icon("archive")),
-                 p(),
-                 actionButton("save_cals", "Save reference data", icon = icon("save"))
-                 ),
-               column(5,
-                 plotOutput("calibration_plot"),
-                 p(),
-                 actionButton("cal_region", "Select highlighted calibration region")
-                 ),
-               column(4, DT::DTOutput("cal_tbl"))
         )
     ),
     actionButton("debug", "debug")
