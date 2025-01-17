@@ -6,7 +6,7 @@ read.hoboV2 <- function(filename){
   d = fread(text = lns, skip = 2, select = 1:3, col.names = c("scan", "dateTime", "value"))
   d[, dateTime := as.POSIXct(dateTime, format = "%m/%d/%y %I:%M:%S %p")]
   d[, value := as.numeric(value)]
-  d[, serialnumber := serial]
+  d[, serialnumber := as.integer(serial)]
   d[, title := title]
   d[, variable_id := 1]
   return(d)
@@ -17,7 +17,7 @@ read.hoboMX <- function(filename){
   data = setDT(readxl::read_xlsx(filename, "Data", col_names = c("scan", "dateTime", "value"), skip = 1))
   serial = meta[grepl("Serial Number", meta3)]$meta4
   data[, value := as.numeric(value)]
-  data[, serialnumber := serial]
+  data[, serialnumber := as.integer(serial)]
   data[, title := ""]
   data[, variable_id := 1]
   return(data)
@@ -26,9 +26,9 @@ read.hoboMX <- function(filename){
 read.miniDOT_raw <- function(filename){
   meta = readLines(filename, n = 2)
   d = fread(filename, skip = 2, col.names = c("dateTime", "battery", "temp", "DO", "Q"))
-  d[, dateTime := as.POSIXct(dateTime, origin = "1970-01-01")]
+  d[, dateTime := as.POSIXct(dateTime, origin = "1970-01-01", tz = "UTC")]
   d = melt(d, id.vars = "dateTime", value.name = "value")
-  d[, serialnumber := meta[1]]
+  d[, serialnumber := as.integer(strsplit(meta[1], "-")[[1]][2])]
   d[, title := ""]
   d[variable == "temp", variable_id := 1]
   d[variable == "DO", variable_id := 2]

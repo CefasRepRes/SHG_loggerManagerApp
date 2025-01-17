@@ -19,6 +19,7 @@ shinyServer(function(input, output, session) {
   dat$deployments = setDT(dbGetQuery(db, "SELECT * FROM deployments ORDER BY start DESC"))
   dat$instruments = setDT(dbGetQuery(db, "SELECT * FROM instruments"))
   dat$locations = setDT(dbGetQuery(db, "SELECT * FROM locations ORDER BY name"))
+  dat$calibrations = setDT(dbGetQuery(db, "SELECT * FROM calibrations ORDER BY cal_date DESC"))
 
   observe({
     updateSelectInput(session, "select_deployment", choices = dat$deployments$filename)
@@ -36,21 +37,23 @@ shinyServer(function(input, output, session) {
   })
 
   output$map = renderLeaflet({
+    dat$locations[, label := paste0(name, " <br>(", latitude, ", ", longitude, ")")]
     leaflet(dat$locations) |>
       addTiles() |>
-      addCircleMarkers(popup = ~name)
+      addCircleMarkers(lat = ~latitude, lng = ~longitude, popup = ~label)
   })
 
   output$timeseries_plot = renderPlotly({
-    validate(need(dat$data, label = "results"))
+    validate(need(dat$data, "Select data"))
     ggplot(dat$data) +
       geom_line(aes(datetime, value, color = site, group = deployment_id)) +
       labs(x=NULL, y = "Temperature") +
       theme_bw() + theme(legend.position = "top")
   })
 
+  # pre upload plot ----
   output$pre_upload_plot = renderPlotly({
-    validate(need(dat$upload, label = ".csv"))
+    validate(need(dat$upload, "Upload HOBO / miniDOT data to view"))
     plot_ly(dat$upload, x = ~dateTime, y = ~ value, type = 'scatter', mode = 'lines') |>
       layout(shapes = list(
         type = "rect", x0 = input$deployment_start, x1 = input$deployment_end,
@@ -65,7 +68,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$cal_tbl = DT::renderDT({
-    women
+    dat$calibrations
   })
 
   observeEvent(input$hobo_file, {
@@ -95,8 +98,6 @@ shinyServer(function(input, output, session) {
     updateDatetimeMaterialPickerInput(session, "deployment_end", max(dat$upload$dateTime, na.rm=T))
   })
   
-  
-
   observeEvent(input$submit, {
     # submit to database ----
     new_deployment_id = dbGetQuery(db, "SELECT MAX(deployment_id)+1 AS id FROM deployments")$id
@@ -138,16 +139,26 @@ shinyServer(function(input, output, session) {
     })
   })
   
-  observeEvent(input$download, {
-    # download .CSV ----
-    fwrite(dat$results, filename = "export.csv")
-    showNotification("data written as export.csv", duration=NULL, type = "message")
-  })
+  output$download_csv <- downloadHandler(
+    # download CSV ----
+    filename = function() {
+      paste0("logger-", Sys.Date(), ".csv")
+    },
+    content = function(filename) {
+      fwrite(dat$results, file = filename)
+    }
+  )
   
-  observeEvent(input$export_database, {
-    # export database ----
-  })
-
+  output$download_db <- downloadHandler(
+    # download db ----
+    filename = function() {
+      paste0("loggerdb-", Sys.Date(), ".sqlite3.zip")
+    },
+    content = function(filename) {
+      zip(filename, "loggerdb.sqlite3")
+    }
+  )
+  
   observeEvent(input$debug, {
     browser()
   })
