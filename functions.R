@@ -38,8 +38,8 @@ read.miniDOT_raw <- function(filename){
 
 read.miniDOT <- function(filename){
   meta = readLines(filename, n = 2)
-  d = fread(filename, skip = 9, col.names = c("unix", "UTC", "GMT", "Batt", "temp", "DO", "SAT", "Q"))
-  d = melt(d, id.vars = "UTC", measure.vars = c("temp", "DO"), value.name = "value")
+  d = fread(filename, skip = 9, col.names = c("unix", "dateTime", "GMT", "Batt", "temp", "DO", "SAT", "Q"))
+  d = melt(d, id.vars = "dateTime", measure.vars = c("temp", "DO"), value.name = "value")
   d[, serialnumber := stringr::str_extract(meta[2], "\\d+-\\d+")]
   d[variable == "temp", variable_id := 1]
   d[variable == "DO", variable_id := 2]
