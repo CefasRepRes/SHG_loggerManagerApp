@@ -10,6 +10,13 @@ Sys.setenv(tz = "UTC")
 db = DBI::dbConnect(RSQLite::SQLite(), "loggerdb.sqlite3")
 source("functions.R")
 
+  # added up update database structure, can be removed in later versions
+if(!("depth" %in% DBI::dbListFields(db, "deployments"))){
+  print("depth field not found, adding to deployments table")
+  DBI::dbExecute(db, "ALTER TABLE deployments
+                 ADD COLUMN depth INTEGER;")
+}
+
 onStop(function() {
   DBI::dbDisconnect(db)
 })
@@ -18,6 +25,7 @@ shinyServer(function(input, output, session) {
   dat = reactiveValues()
   dat$deployments = setDT(dbGetQuery(db, "SELECT * FROM deployments ORDER BY start DESC"))
   dat$instruments = setDT(dbGetQuery(db, "SELECT * FROM instruments"))
+  dat$variables = setDT(dbGetQuery(db, "SELECT * FROM variables ORDER BY variable_id DESC"))
   dat$locations = setDT(dbGetQuery(db, "SELECT * FROM locations ORDER BY name"))
   dat$calibrations = setDT(dbGetQuery(db, "SELECT * FROM calibrations ORDER BY cal_date DESC"))
 
@@ -103,7 +111,8 @@ shinyServer(function(input, output, session) {
                                 instrument_id = dat$instruments[serial == dat$upload$serialnumber[1]]$instrument_id,
                                 location_id = dat$locations[name == input$select_location]$location_id,
                                 start = min(dat$upload$dateTime, na.rm = T),
-                                end = max(dat$upload$dateTime, na.rm = T))
+                                end = max(dat$upload$dateTime, na.rm = T),
+                                depth = input$depth)
     results = dat$upload[,.(datetime = dateTime,
                             deployment_id = new_deployment_id,
                             value,

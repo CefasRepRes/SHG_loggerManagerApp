@@ -38,6 +38,7 @@ shinyUI(
           fileInput("hobo_file", "Hobo", buttonLabel = "Upload...", accept = c(".csv", ".xlsx")),
           fileInput("minidot_file", "Minidot", buttonLabel = "Upload...", accept = ".txt"),
           selectizeInput("select_location", "Select location", choices = ""),
+          numericInput("depth", "Depth", value = 0, min = 0, step = 1),
           h4("select in-water start:"),
           shinyDatetimePickers::datetimeMaterialPickerInput("deployment_start"),
           h4("select in-water end:"),
