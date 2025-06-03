@@ -101,8 +101,33 @@ shinyServer(function(input, output, session) {
   # load_minidot ----
     dat$upload = read.miniDOT(input$minidot_file$datapath)
     dat$upload$filename = input$minidot_file$name
+    if(!dat$upload$serialnumber[1] %in% dat$instruments$serial){
+      showNotification("This instrument has not been used before, a new record will be made", type = "warning")
+      # Check if new sensor
+      if(!dat$upload$serialnumber[1] %in% dat$instruments$serial){
+        showModal(modalDialog(
+          title = "Unknown sensor",
+          "This sensor has not been used before, do you wish to add it as a new PME MiniDOT",
+          footer = tagList(
+            modalButton("Cancel"),
+            actionButton("add_miniDOT", "OK")
+            )
+          ))
+      }
+    }
     updateDatetimeMaterialPickerInput(session, "deployment_start", min(dat$upload$dateTime, na.rm=T))
     updateDatetimeMaterialPickerInput(session, "deployment_end", max(dat$upload$dateTime, na.rm=T))
+  })
+  
+  observeEvent(input$add_miniDOT, {
+    new_sensor = data.frame(
+      instrument_id = dbGetQuery(db, "SELECT MAX(instrument_id)+1 AS id FROM instruments")$id,
+      type = "PME",
+      model = "MiniDOT",
+      serial = dat$upload$serialnumber[1])
+    dbAppendTable(db, "instruments", new_sensor)
+    dat$instruments = setDT(dbGetQuery(db, "SELECT * FROM instruments"))
+    removeModal()
   })
   
   observeEvent(input$submit, {
