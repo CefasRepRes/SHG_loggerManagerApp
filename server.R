@@ -62,13 +62,15 @@ shinyServer(function(input, output, session) {
   # pre upload plot ----
   output$pre_upload_plot = renderPlotly({
     validate(need(dat$upload, "Upload HOBO / miniDOT data to view"))
-    plot_ly(dat$upload, x = ~dateTime, y = ~ value, type = 'scatter', mode = 'lines') |>
-      layout(shapes = list(
-        type = "rect", x0 = input$deployment_start, x1 = input$deployment_end,
-        y0 = min(dat$upload$value, na.rm = T), y1 = max(dat$upload$value, na.rm = T),
-        line = list(color = "rgba(255, 0, 0, 0)"),  # No border line
-        fillcolor = "rgba(55, 55, 55, 0.2)", layer = "below"
-      ))
+    d = merge(dat$upload, dat$variables, by = "variable_id")
+    d[, lab := paste0(varname, " (", unit, ")")]
+      plot_ly(d, x = ~dateTime, y = ~ value, type = 'scatter', mode = 'lines', name = ~lab) |>
+        layout(shapes = list(
+          type = "rect", x0 = input$deployment_start, x1 = input$deployment_end,
+          y0 = min(dat$upload$value, na.rm = T), y1 = max(dat$upload$value, na.rm = T),
+          line = list(color = "rgba(255, 0, 0, 0)"),  # No border line
+          fillcolor = "rgba(55, 55, 55, 0.2)", layer = "below"),
+          legend = list(x = 0, y = 100))
   })
 
   output$deployments = DT::renderDT({
