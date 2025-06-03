@@ -39,8 +39,9 @@ read.miniDOT_raw <- function(filename){
 read.miniDOT <- function(filename){
   meta = readLines(filename, n = 2)
   d = fread(filename, skip = 9, col.names = c("unix", "dateTime", "GMT", "Batt", "temp", "DO", "SAT", "Q"))
-  d = melt(d, id.vars = "dateTime", measure.vars = c("temp", "DO"), value.name = "value")
-  d[, serialnumber := stringr::str_extract(meta[2], "\\d+-\\d+")]
+  d[, scan := 1:.N]
+  d = melt(d, id.vars = c("dateTime", "scan"), measure.vars = c("temp", "DO"), value.name = "value")
+  d[, serialnumber := as.integer(stringr::str_extract(meta[2], "\\d+-(\\d+)", group = 1))]
   d[variable == "temp", variable_id := 1]
   d[variable == "DO", variable_id := 2]
   d = d[!is.na(variable_id),-c("variable")]

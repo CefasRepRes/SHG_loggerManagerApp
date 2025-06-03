@@ -39,6 +39,7 @@ shinyServer(function(input, output, session) {
     selected_deployment_ids = dat$deployments[filename %in% input$select_deployment]$deployment_id
     selected_deployment_ids = paste(selected_deployment_ids, collapse = ",")
     query = paste0("SELECT * FROM data WHERE deployment_id IN (", selected_deployment_ids, ")")
+    query = paste0(query, "AND variable = 'Temperature'")
     print(query)
     dat$data = setDT(dbGetQuery(db, query))
     dat$data[, datetime := as.POSIXct(datetime, format = "%Y-%m-%dT%H:%M")]
@@ -106,15 +107,28 @@ shinyServer(function(input, output, session) {
   
   observeEvent(input$submit, {
     # submit to database ----
+    if(input$select_location == "UNKNOWN"){
+      showNotification("You must select a valid location", type = "error")
+      return()
+    }
+    if(input$depth == 0){
+      showNotification("You must specify the depth the logger was at", type = "error")
+      return()
+    }
+    
     new_deployment_id = dbGetQuery(db, "SELECT MAX(deployment_id)+1 AS id FROM deployments")$id
     new_deployment = data.table(filename = dat$upload$filename[1],
                                 location_id = dat$locations[name == input$select_location]$location_id,
                                 deployment_id = new_deployment_id,
                                 instrument_id = dat$instruments[serial == dat$upload$serialnumber[1]]$instrument_id,
-                                location_id = dat$locations[name == input$select_location]$location_id,
                                 start = min(dat$upload$dateTime, na.rm = T),
                                 end = max(dat$upload$dateTime, na.rm = T),
                                 depth = input$depth)
+    
+    if(nrow(new_deployment) != 1){
+      showNotification("New deployment record is invalid, unable to upload", type = "error")
+      return()
+    }
     results = dat$upload[,.(datetime = dateTime,
                             deployment_id = new_deployment_id,
                             value,
