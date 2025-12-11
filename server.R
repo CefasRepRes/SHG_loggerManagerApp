@@ -140,14 +140,26 @@ shinyServer(function(input, output, session) {
       showNotification("You must specify the depth the logger was at", type = "error")
       return()
     }
+    if(input$deployment_start > input$deployment_end){
+      showNotification("Deployment start time is after deployment end time!", type = "error")
+      return()
+    }
+    if(input$deployment_start < min(dat$upload$datetime, na.rm = T)){
+      showNotification("Deployment start time is before first measurement!", type = "error")
+      return()
+    }
+    if(input$deployment_end > max(dat$upload$datetime, na.rm = T)){
+      showNotification("Deployment start time is after last measurement!", type = "error")
+      return()
+    }
     
     new_deployment_id = dbGetQuery(db, "SELECT MAX(deployment_id)+1 AS id FROM deployments")$id
     new_deployment = data.table(filename = dat$upload$filename[1],
                                 location_id = dat$locations[name == input$select_location]$location_id,
                                 deployment_id = new_deployment_id,
                                 instrument_id = dat$instruments[serial == dat$upload$serialnumber[1]]$instrument_id,
-                                start = min(dat$upload$dateTime, na.rm = T),
-                                end = max(dat$upload$dateTime, na.rm = T),
+                                start = input$deployment_start,
+                                end = input$deployment_end,
                                 depth = input$depth)
     
     if(nrow(new_deployment) != 1){
