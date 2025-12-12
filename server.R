@@ -67,11 +67,23 @@ shinyServer(function(input, output, session) {
     d[, lab := paste0(varname, " (", unit, ")")]
       plot_ly(d, x = ~dateTime, y = ~ value, type = 'scatter', mode = 'lines', name = ~lab) |>
         layout(shapes = list(
-          type = "rect", x0 = input$deployment_start, x1 = input$deployment_end,
-          y0 = min(dat$upload$value, na.rm = T), y1 = max(dat$upload$value, na.rm = T),
-          line = list(color = "rgba(255, 0, 0, 0)"),  # No border line
-          fillcolor = "rgba(55, 55, 55, 0.2)", layer = "below"),
-          legend = list(x = 0, y = 100))
+          list(
+            type = "rect",
+            x0 = min(dat$upload$dateTime-1800, na.rm = T), x1 = input$deployment_start,
+            y0 = min(dat$upload$value, na.rm = T), y1 = max(dat$upload$value, na.rm = T),
+            line = list(color = "rgba(255, 0, 0, 0)"),  # No border line
+            fillcolor = "rgba(204, 51, 102, 0.5)", layer = "above"
+            ),
+          list(
+            type = "rect",
+            x1 = max(dat$upload$dateTime+1800, na.rm = T), x0 = input$deployment_end,
+            y0 = min(dat$upload$value, na.rm = T), y1 = max(dat$upload$value, na.rm = T),
+            line = list(color = "rgba(255, 0, 0, 0)"),  # No border line
+            fillcolor = "rgba(204, 51, 102, 0.5)", layer = "above"
+            )
+          ),
+          legend = list(x = 0, y = 100)
+        )
   })
 
   output$deployments = DT::renderDT({
@@ -89,6 +101,26 @@ shinyServer(function(input, output, session) {
     if(grepl("\\.xlsx", input$hobo_file$name, ignore.case = T)){
       dat$upload = read.hoboMX(input$hobo_file$datapath)
     }
+    
+    if(all(is.na(dat$upload$dateTime))){
+      showNotification("Unable to read date time, likely incorrect format. please make sure it is MM/DD/YY HH:MM:SS", duration=10, type = "error")
+    }
+    
+    if(!dat$upload$serialnumber[1] %in% dat$instruments$serial){
+      showNotification(paste("Sensor serial number", dat$upload$serialnumber[1], "not found in database"), type = "warning")
+      # Check if new sensor
+      if(!dat$upload$serialnumber[1] %in% dat$instruments$serial){
+        showModal(modalDialog(
+          title = "Unknown sensor",
+          "This sensor has not been used before, do you wish to add it as a new HOBO",
+          footer = tagList(
+            modalButton("Cancel"),
+            actionButton("add_HOBO", "OK")
+            )
+          ))
+      }
+    }
+    
     dat$upload$filename = input$hobo_file$name
     updateDatetimeMaterialPickerInput(session, "deployment_start", min(dat$upload$dateTime, na.rm=T))
     updateDatetimeMaterialPickerInput(session, "deployment_end", max(dat$upload$dateTime, na.rm=T))
@@ -102,7 +134,7 @@ shinyServer(function(input, output, session) {
     dat$upload = read.miniDOT(input$minidot_file$datapath)
     dat$upload$filename = input$minidot_file$name
     if(!dat$upload$serialnumber[1] %in% dat$instruments$serial){
-      showNotification("This instrument has not been used before, a new record will be made", type = "warning")
+      showNotification(paste("Sensor serial number", dat$upload$serialnumber[1], "not found in database"), type = "warning")
       # Check if new sensor
       if(!dat$upload$serialnumber[1] %in% dat$instruments$serial){
         showModal(modalDialog(
@@ -130,6 +162,17 @@ shinyServer(function(input, output, session) {
     removeModal()
   })
   
+  observeEvent(input$add_HOBO, {
+    new_sensor = data.frame(
+      instrument_id = dbGetQuery(db, "SELECT MAX(instrument_id)+1 AS id FROM instruments")$id,
+      type = "HOBO",
+      model = "unknown",
+      serial = dat$upload$serialnumber[1])
+    dbAppendTable(db, "instruments", new_sensor)
+    dat$instruments = setDT(dbGetQuery(db, "SELECT * FROM instruments"))
+    removeModal()
+  })
+  
   observeEvent(input$submit, {
     # submit to database ----
     if(input$select_location == "UNKNOWN"){
@@ -144,11 +187,11 @@ shinyServer(function(input, output, session) {
       showNotification("Deployment start time is after deployment end time!", type = "error")
       return()
     }
-    if(input$deployment_start < min(dat$upload$datetime, na.rm = T)){
+    if(input$deployment_start < min(dat$upload$dateTime, na.rm = T)){
       showNotification("Deployment start time is before first measurement!", type = "error")
       return()
     }
-    if(input$deployment_end > max(dat$upload$datetime, na.rm = T)){
+    if(input$deployment_end > max(dat$upload$dateTime, na.rm = T)){
       showNotification("Deployment start time is after last measurement!", type = "error")
       return()
     }
