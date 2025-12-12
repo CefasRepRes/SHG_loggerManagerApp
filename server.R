@@ -39,8 +39,6 @@ shinyServer(function(input, output, session) {
     selected_deployment_ids = dat$deployments[filename %in% input$select_deployment]$deployment_id
     selected_deployment_ids = paste(selected_deployment_ids, collapse = ",")
     query = paste0("SELECT * FROM data WHERE deployment_id IN (", selected_deployment_ids, ")")
-    query = paste0(query, "AND variable = 'Temperature'")
-    print(query)
     dat$data = setDT(dbGetQuery(db, query))
     dat$data[, datetime := as.POSIXct(datetime, format = "%Y-%m-%dT%H:%M")]
   })
@@ -56,8 +54,10 @@ shinyServer(function(input, output, session) {
     validate(need(dat$data, "Select data"))
     ggplot(dat$data) +
       geom_line(aes(datetime, value, color = site, group = deployment_id)) +
-      labs(x=NULL, y = "Temperature") +
-      theme_bw() + theme(legend.position = "top")
+      labs(x=NULL, y = NULL) +
+      facet_grid(paste(variable, "(", unit, ")") ~ ., scales = "free_y") +
+      theme_bw() +
+      theme(legend.position = "top")
   })
 
   # pre upload plot ----
@@ -87,7 +87,9 @@ shinyServer(function(input, output, session) {
   })
 
   output$deployments = DT::renderDT({
-    dat$deployments
+    merge(dat$deployments,
+          dat$instruments,
+          by = "instrument_id")[order(deployment_id)]
   })
   
   observeEvent(input$hobo_file, {
@@ -166,7 +168,7 @@ shinyServer(function(input, output, session) {
     new_sensor = data.frame(
       instrument_id = dbGetQuery(db, "SELECT MAX(instrument_id)+1 AS id FROM instruments")$id,
       type = "HOBO",
-      model = "unknown",
+      model = "TidbitMX",
       serial = dat$upload$serialnumber[1])
     dbAppendTable(db, "instruments", new_sensor)
     dat$instruments = setDT(dbGetQuery(db, "SELECT * FROM instruments"))
